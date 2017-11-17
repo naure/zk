@@ -165,7 +165,7 @@ for gridI in range(len(v_challenges)):
     assert checkDigits(np.array(response) - 1), "The response is not a valid solution."
 
 v_proofOfSubsets = v_proof["proof of subset"]
-v_isSubset = subsetProver.verifySubset(v_subset, v_proofOfSubsets, int(v_commitsRoot))
+v_isSubset = subsetProver.verifySubset(v_subset, v_proofOfSubsets, v_commitsRoot)
 assert v_isSubset, "The responses are not all included in the commitment."
 
 print("Proof verified!")

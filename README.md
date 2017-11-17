@@ -41,6 +41,10 @@ if all values were parts of the commited set.
 Finding a proof for an invalid subset is equivalent to decrypting an
 RSA-encrypted message.
 
+One issue is that this scheme is for a set and not a map, so more values can be
+included. It can be addressed by commiting to the size of the set with a min-hash
+scheme, however it is very rudimentary at the moment.
+
 ## Demo with Sudokus
 
 1. Find a secret Sudoku grid.

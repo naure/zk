@@ -7,6 +7,7 @@ TODO: Somehow limit the set size, for instance with a min-hash scheme.
 import sys
 import math
 from hashlib import sha3_256
+import numpy as np
 import gmpy2
 
 HASH_BYTES = 16
@@ -47,6 +48,19 @@ def pows(g, exponents, mod):
     return y
 
 
+class MaxHash(object):
+    # 5 buckets of 6 bytes / 262144 values.
+    def __init__(self):
+        self.maxs = [0] * 5
+
+    def add(self, h):
+        for i in range(5):
+            v = bytes_to_int(h[6*i : 6*(i+1)])
+            if v > self.maxs[i]:
+                self.maxs[i] = v
+        return h
+
+
 class SubsetProverRsa(object):
     " Same as plain, but pass the commit through the group. Verifier needs an extra subset-dependent proof. "
 
@@ -60,27 +74,46 @@ class SubsetProverRsa(object):
     assert MOD % G != 0
 
     def __init__(self, items):
-        self.intHashes = self.hashItems(items)
+        self.intHashes, self.maxs = self.hashItems(items)
         assert len(items) == len(set(self.intHashes)), "Duplicates are not supported yet."
 
     def hashItems(self, items):
-        return [primeHash(to_bytes(o)) for o in items]
+        primes = []
+        maxHash = MaxHash()
+
+        for o in items:
+            h = sha3_256(to_bytes(o)).digest()
+
+            # Derive a prime from the data.
+            i = bytes_to_int(h[:HASH_BYTES])
+            p = int(gmpy2.next_prime(i))
+            primes.append(p)
+
+            # Track maxs
+            maxHash.add(h)
+
+        return primes, maxHash.maxs
 
     def commit(self):
-        return pows(self.G, self.intHashes, self.MOD)
+        return [pows(self.G, self.intHashes, self.MOD), self.maxs]
 
     def proveSubset(self, subset):
         # hash(items not in subset)
         # Equivalent to commit / hash(subset)
         # TODO: Support duplicates
-        subsetHashes = self.hashItems(subset)
+        subsetHashes, maxs = self.hashItems(subset)
         otherExponents = set(self.intHashes).difference(subsetHashes)
         return pows(self.G, otherExponents, self.MOD)
 
     def verifySubset(self, subset, proof, commit):
-        subsetHashes = self.hashItems(subset)
+        subsetHashes, subsetMaxs = self.hashItems(subset)
         actual = pows(proof, subsetHashes, self.MOD)
-        return actual == commit
+
+        commitNum, commitMaxs = commit
+        maxOk = np.all(np.array(subsetMaxs) <= np.array(commitMaxs))
+        # TODO: Verify estimated cardinality
+
+        return actual == commitNum and maxOk
 
 
 SubsetProver = SubsetProverRsa
@@ -97,7 +130,7 @@ if __name__ == "__main__":
     # Equivalent: set(fullSet).difference(subset)
 
     sp = SubsetProver(fullSet)
-    commit = sp.commit(); print("Commitment:", bits(commit), "bits")
+    commit = sp.commit(); print("Commitment:", bits(commit[0]), "bits")
     proof = sp.proveSubset(subset); print("Proof:", bits(proof), "bits")
     assert sp.verifySubset(subset, proof, commit)
     print("Accepted correct proof!")
