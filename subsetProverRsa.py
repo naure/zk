@@ -1,4 +1,6 @@
-""" Prove that some items are a subset of a committed set.
+"""
+Cryptographic accumulator.
+Prove that some items are a subset of a committed set.
 
 TODO: Somehow limit the set size, for instance with a min-hash scheme.
 """
@@ -40,12 +42,39 @@ def bits(n):
     return math.ceil(math.log2(n))
 
 
+def prod(xs):
+    y = 1
+    for x in xs:
+        y *= x
+    return y
+
 def pows(g, exponents, mod):
     " Successive exponentiations in a group of unknown order. "
     y = g
     for e in exponents:
         y = pow(y, int(e), mod)
     return y
+
+def extended_euclidean_algorithm(a, b):
+    """
+    Returns a three-tuple (gcd, x, y) such that
+    a * x + b * y == gcd, where gcd is the greatest
+    common divisor of a and b.
+
+    This function implements the extended Euclidean
+    algorithm and runs in O(log b) in the worst case.
+    """
+    s, old_s = 0, 1
+    t, old_t = 1, 0
+    r, old_r = b, a
+
+    while r != 0:
+        quotient = old_r // r
+        old_r, r = r, old_r - quotient * r
+        old_s, s = s, old_s - quotient * s
+        old_t, t = t, old_t - quotient * t
+
+    return old_r, old_s, old_t
 
 
 class MaxHash(object):
@@ -115,6 +144,32 @@ class SubsetProverRsa(object):
 
         return actual == commitNum and maxOk
 
+    def proveDisjoint(self, disjoint):
+        # From https://www.cs.purdue.edu/homes/ninghui/papers/accumulator_acns07.pdf
+
+        u = prod(self.intHashes)
+        # commit == pow(G, u, MOD)
+        x = prod(self.hashItems(disjoint)[0])
+
+        gcd, a, b = extended_euclidean_algorithm(u, x); gcd
+        if gcd != 1:
+            print("Warning: Some members of X are in the commited set, we cannot prove that they are disjoint!")
+            return [0, 0]
+
+        # TODO: Bring the value of a under a maximum size:
+        # k=?; a = a + k * x; b = b - k * u
+
+        d = pow(sp.G, -b, sp.MOD)
+        return [a, d]
+
+    def verifyDisjoint(self, disjoint, proof, commit):
+        # TODO: validate proof values explicitely
+        disjointHashes, _ = self.hashItems(disjoint)
+        a, d = proof
+        d_x = (pows(d, disjointHashes, self.MOD) * self.G) % self.MOD
+        c_a = pow(commit[0], a, self.MOD)
+        return d_x == c_a
+
 
 SubsetProver = SubsetProverRsa
 
@@ -124,17 +179,35 @@ if __name__ == "__main__":
     import math
     import numpy as np
 
-    fullSet    = np.array([3, 12, 17, 23, 35, 99] + list(range(100,200)))
+    fullSet    = np.array([3, 12, 17, 23, 35, 99]) # + list(range(100,200)))
     subset     = np.array([   12,     23        ])
-    complement = np.array([3,     17,     35, 99] + list(range(100,200)))
-    # Equivalent: set(fullSet).difference(subset)
+    complement = np.array([3,     17,     35, 99]) # + list(range(100,200)))
+    disjoint   = np.array([                        5, 6])
+    mixed      = np.array([           23,          5, 6])
 
     sp = SubsetProver(fullSet)
     commit = sp.commit(); print("Commitment:", bits(commit[0]), "bits")
-    proof = sp.proveSubset(subset); print("Proof:", bits(proof), "bits")
-    assert sp.verifySubset(subset, proof, commit)
-    print("Accepted correct proof!")
 
-    proofWrong = sp.proveSubset(["5"])
-    assert not sp.verifySubset(["5"], proofWrong, commit)
-    print("Rejected incorrect proof!")
+    proofSubset = sp.proveSubset(subset); print("Proof:", bits(proofSubset), "bits")
+    assert sp.verifySubset(subset, proofSubset, commit)
+    print("Accepted correct proof of subset!")
+
+    cheatDisjoint = sp.proveSubset(disjoint)
+    assert not sp.verifySubset(disjoint, cheatDisjoint, commit)
+    print("Rejected incorrect proof for a disjoint set!")
+
+    cheatMixed = sp.proveSubset(mixed)
+    assert not sp.verifySubset(mixed, cheatMixed, commit)
+    print("Rejected incorrect proof for an overlapping set!")
+
+    proofNonSubset = sp.proveDisjoint(disjoint)
+    assert sp.verifyDisjoint(disjoint, proofNonSubset, commit)
+    print("Accepted correct proof of non-subset!")
+
+    cheatNotSubset = sp.proveDisjoint(subset)
+    assert not sp.verifyDisjoint(subset, cheatNotSubset, commit)
+    print("Rejected incorrect proof of non-subset (subset)!")
+
+    cheatNotMixed = sp.proveDisjoint(mixed)
+    assert not sp.verifyDisjoint(mixed, cheatNotMixed, commit)
+    print("Rejected incorrect proof of non-subset (mixed)!")
