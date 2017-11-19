@@ -46,8 +46,9 @@ included. It is addressed by commiting to the size of the set with a LogLog
 count-distinct scheme, however it is very rudimentary at the moment.
 
 It turns out that it is possible to prove non-membership of values. We can prove
-that none of the values that are not part of the commited solution were included
-in the commitment number. WiP.
+that none of the values that are not part of the solution were over-commited.
+WiP in subsetProverRsa.
+
 
 ## Demo with Sudokus
 

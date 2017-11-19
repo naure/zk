@@ -2,7 +2,22 @@
 Cryptographic accumulator.
 Prove that some items are a subset of a committed set.
 
-TODO: Somehow limit the set size, for instance with a min-hash scheme.
+Next steps:
+
+Commit to an array using successive (small) primes instead of prime-hashing.
+
+Treat each prime p as a slot holding a binary number:
+0 = Do not include p it and prove non-membership.
+1 = Include p and prove membership.
+
+To encode an array of values, use several consecutive slots to
+include/exclude the bits of each value.
+
+Alternative for small values v, or to prove range (a <= v < b):
+Let each slot p store a value v. Include p^v in the set and:
+Prove that p^a is a member, so v >= a.
+Prove that p^(a+1) is not a member, so v < a+1 and v = a.
+
 """
 
 #%% Hash and bytes utilities
