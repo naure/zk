@@ -168,8 +168,12 @@ class RSACommitment(object):
             print("Warning: Some members of X are in the commited set, we cannot prove that they are disjoint!")
             return [0, 0]
 
-        # TODO: Bring the value of a under a maximum size:
-        # k=?; a = a + k * x; b = b - k * u
+        # Bring the coefficients into the right range.
+        # Find k such that a=a+k*x > 0, and b=b-k*u < 0.
+        if a < 0 or b > 0:
+            k = max(-a // x, b // u) + 1
+            a = a + k * x
+            b = b - k * u
 
         d = pow(sp.G, -b, sp.MOD)
         return [a, d]
@@ -181,7 +185,6 @@ class RSACommitment(object):
         d_x = (pows(d, disjointPrimes, self.MOD) * self.G) % self.MOD
         c_a = pow(commit, a, self.MOD)
         return d_x == c_a
-
 
 
 #%% Example of using SubsetProver
@@ -210,9 +213,9 @@ if __name__ == "__main__":
     assert not sp.verifyMembers(mixed, cheatMixed, commit)
     print("Rejected incorrect proof for an overlapping set!")
 
-    proofNonSubset = sp.proveDisjoint(disjoint)
-    assert sp.verifyDisjoint(disjoint, proofNonSubset, commit)
-    print("Proof of non-memberships:", bits(proofNonSubset[0])+bits(proofNonSubset[1]), "bits")
+    proofDisjoint = sp.proveDisjoint(disjoint)
+    assert sp.verifyDisjoint(disjoint, proofDisjoint, commit)
+    print("Proof of non-memberships:", bits(proofDisjoint[0])+bits(proofDisjoint[1]), "bits")
     print("Accepted correct proof of non-subset!")
 
     cheatNotSubset = sp.proveDisjoint(subset)
