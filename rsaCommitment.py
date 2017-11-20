@@ -98,8 +98,6 @@ def extended_euclidean_algorithm(a, b):
 
 
 # Prime helpers
-maxPrime = 1000*1000 # * 20 to reach 1M primes
-
 
 def primesfrom2to(n):
     # https://stackoverflow.com/questions/2068372/fastest-way-to-list-all-primes-below-n-in-python/3035188#3035188
@@ -114,12 +112,19 @@ def primesfrom2to(n):
     return np.r_[2,3,((3*np.nonzero(sieve)[0]+1)|1)]
 
 
-firstPrimes = primesfrom2to(maxPrime)
-print("Precomputed %i primes < %i" % (len(firstPrimes), maxPrime))
+firstPrimes = []
 
+def initPrimes(maxPrime):
+    # TODO: Ensure numbers of primes instead of maximum.
+    global firstPrimes
+    firstPrimes = primesfrom2to(maxPrime)
+    print("Precomputed %i primes < %i" % (len(firstPrimes), maxPrime))
 
 def toPrimes(indices):
     " Map a list of indices to a list of primes. "
+    maxi = np.max(indices)
+    if maxi >= len(firstPrimes):
+        initPrimes(maxi * 20)
     return firstPrimes[ indices ]
 
 
@@ -161,6 +166,7 @@ class RSACommitment(object):
     assert gmpy2.is_prime(G)
     assert MOD % G != 0
 
+
     def commit(self, indices):
         self.committedPrimes = toPrimes(indices)
         return pows(self.G, self.committedPrimes, self.MOD)
@@ -195,7 +201,7 @@ class RSACommitment(object):
             a = a + k * x
             b = b - k * u
 
-        d = pow(sp.G, -b, sp.MOD)
+        d = pow(self.G, -b, self.MOD)
         return [a, d]
 
     def verifyDisjoint(self, disjointIndices, proof, commit):
