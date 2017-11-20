@@ -41,13 +41,8 @@ if all values were parts of the commited set.
 Finding a proof for an invalid subset is equivalent to decrypting an
 RSA-encrypted message.
 
-One issue is that this commitment scheme is for a set and not an array, so more values can be
-included. It is addressed by commiting to the size of the set with a LogLog
-count-distinct scheme, however it is very rudimentary at the moment.
-
 It turns out that it is possible to prove non-membership of values. We can prove
 that none of the values that are not part of the solution were over-commited.
-WiP in rsaCommitment.py.
 
 
 ## Demo with Sudokus

@@ -11,16 +11,22 @@ Treat each prime p as a slot holding a binary number:
 To encode an array of values, use several consecutive slots to
 include/exclude the bits of each value.
 
+It's actually possible to prove memberships and non-memberships in one step:
+In the original "disjoint" check, replace the `g` by `g^x`.
+If it passes, `gcd(c, x) == x`, meaning that all x belong and no others.
+
+Now the proving part is beautiful: its inputs do not say which values
+belong to the set or not; it doesn't even know what it is proving!
+Then the verifier does treat members and non-members specially to see
+whether the gcd checks out.
+
 Alternative for small values v, or to prove range (a <= v < b):
 Let each slot p store a value v. Include p^v in the set and:
 Prove that p^a is a member, so v >= a.
 Prove that p^(a+1) is not a member, so v < a+1 and v = a.
 
 TODO: Add random decoy value to prevent an attacker from testing set values.
-TODO: Merge memberships and non-memberships proofs:
-        In the "disjoint" check, replace the `g` by `g^x`.
-        If it passes, `gcd(c, x) == x`, meaning that all x belong and no others.
-TODO: Optimize the a,b coefficients in proveDisjoint().
+TODO: Optimize the a,b coefficients in proveMixed().
 TODO: Decide which is more performant: to include zeros or ones in the set.
 TODO: Implement as a map using primeHash as starting points for successive bits.
 TODO: Consider an implementation with elliptic curve pairing.
@@ -124,7 +130,7 @@ def initPrimes(maxPrime):
 
 def toPrimes(indices):
     " Map a list of indices to a list of primes. "
-    maxi = np.max(indices)
+    maxi = np.max(indices) if len(indices) else 1
     if maxi >= len(firstPrimes):
         initPrimes(maxi * 20)
     return firstPrimes[ indices ]
@@ -185,16 +191,24 @@ class RSACommitment(object):
         return actual == commit
 
     def proveDisjoint(self, disjointIndices):
+        return self.proveMixed(disjointIndices, checkDisjoint=True)
+
+    def verifyDisjoint(self, disjointIndices, proof, commit):
+        return self.verifyMixed([], disjointIndices, proof, commit)
+
+
+    def proveMixed(self, subsetIndices, checkDisjoint=False):
         # From https://www.cs.purdue.edu/homes/ninghui/papers/accumulator_acns07.pdf
 
-        u = prod(self.committedPrimes)
+        u = prod(self.committedPrimes)  # All the committed set
         # commit == pow(G, u, MOD)
-        x = prod(toPrimes(disjointIndices))
+        x = prod(toPrimes(subsetIndices))          # Members and non-members to prove
 
         gcd, a, b = extended_euclidean_algorithm(u, x); gcd
-        if gcd != 1:
+        # au + bx == gcd
+
+        if checkDisjoint and gcd != 1:
             print("Warning: Some members of X are in the commited set, we cannot prove that they are disjoint!")
-            return [0, 0]
 
         # Bring the coefficients into the right range.
         # Find k such that a=a+k*x > 0, and b=b-k*u < 0.
@@ -206,15 +220,18 @@ class RSACommitment(object):
         d = pow(self.G, -b, self.MOD)
         return [a, d]
 
-    def verifyDisjoint(self, disjointIndices, proof, commit):
+    def verifyMixed(self, subsetIndices, disjointIndices, proof, commit):
         # TODO: validate proof values explicitely
-        disjointPrimes = toPrimes(disjointIndices)
+        subsetPrimes = list(toPrimes(subsetIndices))
+        g_gcd = pows(self.G, subsetPrimes, self.MOD)
+        disjointPrimes = list(toPrimes(disjointIndices))
         a, d = proof
-        d_x = (pows(d, disjointPrimes, self.MOD) * self.G) % self.MOD
+        d_x = (pows(d, disjointPrimes+subsetPrimes, self.MOD) * g_gcd) % self.MOD
         c_a = pow(commit, a, self.MOD)
         return d_x == c_a
 
 
+#%%
 class RSACommitmentValues(RSACommitment):
     " Commitment of numerical values. "
 
@@ -233,23 +250,15 @@ class RSACommitmentValues(RSACommitment):
         zeros = [i for i in self.zeros if i//self.nbits in valueIds]
         ones  = [i for i in self.ones  if i//self.nbits in valueIds]
 
-        # Prove the zeros are members.
-        proofOfZeros = self.proveMembers(zeros)
-
-        # Prove the ones are not members.
-        proofOfOnes = self.proveDisjoint(ones)
-
-        return [proofOfZeros, proofOfOnes]
+        # Prove that zeros are members and ones are not members.
+        return self.proveMixed(zeros + ones)
 
     def verifyValues(self, valueIds, values, proof, commit):
-        proofOfZeros, proofOfOnes = proof
         # Find indices of binary 1s and 0s of the values to check.
         zeros, ones = toBitPositions(valueIds, values, self.nbits)
-        # Verify the ones are members.
-        zerosOk = self.verifyMembers(zeros, proofOfZeros, commit)
         # Verify the zeros are not members.
-        onesOk = self.verifyDisjoint(ones, proofOfOnes, commit)
-        return zerosOk and onesOk
+        return self.verifyMixed(zeros, ones, proof, commit)
+
 
 
 #%% Example of using SubsetProver
@@ -261,7 +270,7 @@ if __name__ == "__main__":
     subset     = np.array([   12,     23        ])
     complement = np.array([3,     17,     35, 99])
     disjoint   = np.array([                        5, 6]) # + list(range(50100,50200)))
-    mixed      = np.array([           23,          5, 6])
+    mixed      = np.array([   12,     23,          5, 6])
 
     sp = RSACommitment()
     commit = sp.commit(fullSet)
@@ -294,19 +303,24 @@ if __name__ == "__main__":
     assert not sp.verifyDisjoint(mixed, cheatNotMixed, commit)
     print("Rejected incorrect proof of non-subset (mixed)!\n")
 
+    proofMixed = sp.proveMixed(mixed)
+    assert sp.verifyMixed(subset, disjoint, proofMixed, commit)
+    print("Accepted correct proof of a mixed set!")
+
 
     # Example with values
     values    = np.array([3, 12, 17, 23, 35, 99])
     revealIds = [1, 3]
 
-    spv = RSACommitmentValues(8)
+    spv = RSACommitmentValues(nbits=8)
     commit = spv.commitValues(values)
-    proof = spv.proveValues(revealIds)
-    print("Proof of an array of values:",
-        (bits(proof[0]) + bits(proof[1][0]) + bits(proof[1][1])) // 8, "bytes")
 
-    assert spv.verifyValues(revealIds, values[revealIds], proof, commit)
+    proofValues = spv.proveValues(revealIds)
+    print("Proof of an array of values:",
+        (bits(proofValues[0]) + bits(proofValues[1])) // 8, "bytes")
+
+    assert spv.verifyValues(revealIds, values[revealIds], proofValues, commit)
     print("Accepted correct proof of an array of values!\n")
 
-    assert not spv.verifyValues(revealIds, [12, 42], proof, commit)
+    assert not spv.verifyValues(revealIds, [12, 42], proofValues, commit)
     print("Rejected incorrect proof of an array of values!\n")

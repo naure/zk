@@ -118,6 +118,7 @@ proof = {
     "proof-of-work nonce": nonce,
     "responses to challenges": responses.tolist(),
     "proof that responses were committed": proofOfCommitment,
+    "nBits": committer.nbits,
     }
 
 # GZIP will remove most inefficiencies of encodings, duplicate values, etc.
@@ -129,6 +130,7 @@ assert v_proof == proof
 
 
 #%% Phase 6: Verify
+# The v_ prefix indicates verifier's variables.
 
 # commitsRoot and noonce must be a proof-of-work.
 v_commitsRoot = v_proof["commitment to set"]
@@ -156,8 +158,9 @@ for gridI in range(len(v_challenges)):
     assert checkDigits(np.array(response) - 1), "The response is not a valid solution."
 
 
+v_committer = RSACommitmentValues(nbits=v_proof["nBits"])
 v_proofOfResponse = v_proof["proof that responses were committed"]
-v_wasCommitted = committer.verifyValues(v_responseIds, v_responseValues, v_proofOfResponse, v_commitsRoot)
+v_wasCommitted = v_committer.verifyValues(v_responseIds, v_responseValues, v_proofOfResponse, v_commitsRoot)
 assert v_wasCommitted, "The responses are not all included in the commitment."
 
 print("Proof verified!")
