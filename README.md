@@ -47,7 +47,7 @@ count-distinct scheme, however it is very rudimentary at the moment.
 
 It turns out that it is possible to prove non-membership of values. We can prove
 that none of the values that are not part of the solution were over-commited.
-WiP in subsetProverRsa.
+WiP in rsaCommitment.py.
 
 
 ## Demo with Sudokus
