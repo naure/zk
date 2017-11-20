@@ -20,6 +20,8 @@ TODO: Add random decoy value to prevent an attacker from testing set values.
 TODO: Merge memberships and non-memberships proofs:
         In the "disjoint" check, replace the `g` by `g^x`.
         If it passes, `gcd(c, x) == x`, meaning that all x belong and no others.
+TODO: Optimize the a,b coefficients in proveDisjoint().
+TODO: Decide which is more performant: to include zeros or ones in the set.
 TODO: Implement as a map using primeHash as starting points for successive bits.
 TODO: Consider an implementation with elliptic curve pairing.
 

@@ -14,20 +14,13 @@ print("False-positive rate", ((challengeMax - 1) / challengeMax)**nChallenges)
 
 import numpy as np
 from hashUtils import hashObject, str_to_int
-from subsetProverRsa import SubsetProver
+from rsaCommitment import RSACommitmentValues
 from interactiveSudoku import secretGrid, puzzleIndices, makeManyHiddenSudokus, checkDigits
 
 keys, grids = makeManyHiddenSudokus(secretGrid, nChallenges)
 
-items = []
-
-for gridI in range(nChallenges):
-    # Commit to each value
-    for value in grids[gridI].flat:
-        items.append((len(items), value))
-
-subsetProver = SubsetProver(items); len(items)
-commitsRoot = subsetProver.commit(); commitsRoot
+committer = RSACommitmentValues(nbits=4)
+commitsRoot = committer.commitValues(grids.flatten())
 
 
 #%% Phase 2: proof-of-work
@@ -101,20 +94,18 @@ def getSquareIds(gridI, challenge):
     idsInGrid = getResponse(idGrid, challenges[gridI])
     return idsInGrid + gridOffset
 
-
-subset = []
+responseIds = []
 
 # Collect the responses and the Merkle paths for all challenges
 for gridI in range(len(challenges)):
     challenge = challenges[gridI]
     response = getResponse(grids[gridI], challenge)
     responses[gridI] = response
-    ids = getSquareIds(gridI, challenge)
-    subset.extend(zip(ids, response))
+    responseIds.extend(getSquareIds(gridI, challenge))
 
-assert len(set(subset).intersection(items)) == responses.size
+assert len(responseIds) == len(set(responseIds)) == responses.size
 
-proofOfSubset = subsetProver.proveSubset(subset)
+proofOfCommitment = committer.proveValues(responseIds)
 
 
 #%% Phase 5: Pack the proof into a single message
@@ -126,7 +117,7 @@ proof = {
     "commitment to set": commitsRoot,
     "proof-of-work nonce": nonce,
     "responses to challenges": responses.tolist(),
-    "proof of subset": proofOfSubset,
+    "proof that responses were committed": proofOfCommitment,
     }
 
 # GZIP will remove most inefficiencies of encodings, duplicate values, etc.
@@ -151,22 +142,23 @@ assert len(v_challenges) >= nChallenges, "Too few challenges."
 v_responses = v_proof["responses to challenges"]
 assert len(v_challenges) == len(v_responses)
 
-v_subset = []
+v_responseValues = np.array(v_responses).flatten()
+v_responseIds = []
 
 for gridI in range(len(v_challenges)):
     challenge = v_challenges[gridI]
     response = v_responses[gridI]
-    responseIds = getSquareIds(gridI, challenge)
-    v_subset.extend(zip(responseIds, response))
+    v_responseIds.extend(getSquareIds(gridI, challenge))
 
     # Verify that the solution is from a valid Sudoku:
     # * Each set must be all 1-9 digits.
     # * Or, check the puzzle constraints (in that case, it's also 1-9 digits).
     assert checkDigits(np.array(response) - 1), "The response is not a valid solution."
 
-v_proofOfSubsets = v_proof["proof of subset"]
-v_isSubset = subsetProver.verifySubset(v_subset, v_proofOfSubsets, v_commitsRoot)
-assert v_isSubset, "The responses are not all included in the commitment."
+
+v_proofOfResponse = v_proof["proof that responses were committed"]
+v_wasCommitted = committer.verifyValues(v_responseIds, v_responseValues, v_proofOfResponse, v_commitsRoot)
+assert v_wasCommitted, "The responses are not all included in the commitment."
 
 print("Proof verified!")
 
