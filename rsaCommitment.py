@@ -17,6 +17,12 @@ Prove that p^a is a member, so v >= a.
 Prove that p^(a+1) is not a member, so v < a+1 and v = a.
 
 TODO: Add random decoy value to prevent an attacker from testing set values.
+TODO: Merge memberships and non-memberships proofs:
+        In the "disjoint" check, replace the `g` by `g^x`.
+        If it passes, `gcd(c, x) == x`, meaning that all x belong and no others.
+TODO: Implement as a map using primeHash as starting points for successive bits.
+TODO: Consider an implementation with elliptic curve pairing.
+
 """
 
 #%% Hash and bytes utilities
