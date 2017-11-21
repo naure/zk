@@ -218,10 +218,6 @@ class RSACommitment(object):
         d = pow(self.G, -b, self.MOD)
         return [a, d]
 
-#%%
-disjointIndices = set(subsetIndices).difference(self.committedPrimes)
-#%%
-
     def verifyMixed(self, subsetIndices, disjointIndices, proof, commit):
         # TODO: validate proof values explicitely
         subsetPrimes = list(toPrimes(subsetIndices))
