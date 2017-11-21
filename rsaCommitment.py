@@ -122,19 +122,18 @@ def primesfrom2to(n):
 
 firstPrimes = []
 
-def initPrimes(maxPrime):
-    # TODO: Ensure numbers of primes instead of maximum.
+def initPrimes(maxId):
     global firstPrimes
-    firstPrimes = primesfrom2to(maxPrime)
-    print("Precomputed %i primes < %i" % (len(firstPrimes), maxPrime))
+    maxN = maxId * int(np.log(maxId) + 5)
+    firstPrimes = primesfrom2to(maxN)
+    print("Precomputed %i primes < %i" % (len(firstPrimes), maxN))
 
 def toPrimes(indices):
     " Map a list of indices to a list of primes. "
-    maxi = np.max(indices) if len(indices) else 1
-    if maxi >= len(firstPrimes):
-        initPrimes(maxi * 20)
+    maxId = np.max(indices) if len(indices) else 1
+    if maxId >= len(firstPrimes):
+        initPrimes(maxId)
     return firstPrimes[ indices ]
-
 
 def toBitPositions(ids, values, nbits):
     assert len(ids) == len(values)
@@ -196,7 +195,6 @@ class RSACommitment(object):
     def verifyDisjoint(self, disjointIndices, proof, commit):
         return self.verifyMixed([], disjointIndices, proof, commit)
 
-
     def proveMixed(self, subsetIndices, checkDisjoint=False):
         # From https://www.cs.purdue.edu/homes/ninghui/papers/accumulator_acns07.pdf
 
@@ -219,6 +217,10 @@ class RSACommitment(object):
 
         d = pow(self.G, -b, self.MOD)
         return [a, d]
+
+#%%
+disjointIndices = set(subsetIndices).difference(self.committedPrimes)
+#%%
 
     def verifyMixed(self, subsetIndices, disjointIndices, proof, commit):
         # TODO: validate proof values explicitely
@@ -306,7 +308,6 @@ if __name__ == "__main__":
     proofMixed = sp.proveMixed(mixed)
     assert sp.verifyMixed(subset, disjoint, proofMixed, commit)
     print("Accepted correct proof of a mixed set!")
-
 
     # Example with values
     values    = np.array([3, 12, 17, 23, 35, 99])
