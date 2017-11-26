@@ -8,14 +8,24 @@ It turns an interactive system with many challenges into a compact static proof.
 The proof-of-work sets the minimum effort required from an attacker to try a
 commitment, if looking for favorable challenges.
 
-## Constant-size proof of subset
+## Concise commitment scheme
 
-The commitment scheme turns the set of hidden responses into a single number.
-After the responses to reveal are chosen, it produces a proof that they belong
-to the commited set.
+The commitment scheme turns the list of hidden responses into a single number.
+After the responses to reveal are chosen, it produces a proof that those were
+indeed parts of the commitment.
 
 It is based on RSA, in a setting where the private key is known to no one.
-Hopefully, a good trusted setup is available, see https://en.wikipedia.org/wiki/RSA_numbers#RSA-2048.
+Hopefully, a good trusted setup is available and standing since 1991, see https://en.wikipedia.org/wiki/RSA_numbers#RSA-2048.
+
+### Size
+
+* One number as commitment (256 bytes with RSA).
+* One number as proof of membership (same).
+* A proof of non-memberships, of size proportional to the amount of data revealed, which is relatively small if the underlying protocol is efficient.
+
+This adds up to much less than with a hash-based solution like Merkle trees or Bloom filters. With those, each revealed value, even if small, requires several hashes and a salt (16 bytes each).
+
+### Scheme
 
 1. Hash values of the set into prime numbers.
 
@@ -47,9 +57,22 @@ that none of the values that are not part of the solution were over-commited.
 
 ## Demo with Sudokus
 
+A demonstration with the obligatory Sudoku interactive proof.
+
+
+### The underlying interactive protocol
+
 1. Find a secret Sudoku grid.
 
-2. Generate many encrypted versions of the grid.
+2. Prover generates many encrypted versions of the grid, and keeps them hidden.
+
+3. Verifier picks a row, file or block to reveal from each grid, and
+checks that they do contain the numbers from 1 to 9.
+
+See `ZK Sudoku.pdf` that can printed on paper to try it out.
+
+
+### Make it non-interactive
 
 3. Commit to the encrypted values.
 
@@ -57,7 +80,7 @@ that none of the values that are not part of the solution were over-commited.
 
 5. Pick pseudo-random challenges from the commitment and p-o-w.
 
-6. Collect responses and prove that they were commited to.
+6. Collect responses and prove that they were committed to.
 
 7. Serialize / deserialize and measure the proof size.
 
